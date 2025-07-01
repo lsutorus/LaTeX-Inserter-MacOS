@@ -6,7 +6,8 @@ import pyautogui
 import pygetwindow as gw
 import unicodeitplus
 from PIL import Image
-from pynput import keyboard
+# HOTFIX CHANGE: Import GlobalHotKeys instead of the base keyboard listener
+from pynput.keyboard import GlobalHotKeys
 import threading
 import os
 
@@ -19,7 +20,7 @@ from PyQt5.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QAction, QWid
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-
+# ... (no changes to resource_path or LaTeXOverlay class)
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -27,9 +28,7 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-
 class LaTeXOverlay(QWidget):
-    # ... (no changes in this class)
     def __init__(self):
         super().__init__()
         self.setWindowFlags(
@@ -208,33 +207,38 @@ class LaTeXOverlay(QWidget):
             print(f"Failed to paste image for '{latex_code}': {e}")
 
 
+# HOTFIX CHANGE: Rewritten HotkeyListener for simplicity and correctness
 class HotkeyListener(QObject):
+    # This signal will be emitted when the hotkey is pressed
     hotkey_activated = pyqtSignal()
 
     def __init__(self):
         super().__init__()
-        # HOTKEY CHANGE: Changed '<cmd>+<alt>+m' to '<ctrl>+<cmd>+m'
-        self.hotkey = keyboard.HotKey(
-            keyboard.HotKey.parse('<ctrl>+<cmd>+m')
-        )
         self.listener_thread = None
 
-    def run(self):
-        with keyboard.Listener(on_press=self.on_press) as listener:
-            listener.join()
-
-    def on_press(self, key):
-        if self.hotkey.check(key):
-            self.hotkey_activated.emit()
+    def on_activate_hotkey(self):
+        # This function is called directly by pynput when the hotkey is pressed.
+        # It's running in a different thread, so we emit a signal
+        # to safely trigger the action in the main GUI thread.
+        self.hotkey_activated.emit()
 
     def start(self):
+        # We start the listener in a separate thread so it doesn't block the GUI.
         if not self.listener_thread:
             self.listener_thread = threading.Thread(target=self.run, daemon=True)
             self.listener_thread.start()
 
+    def run(self):
+        # Define the hotkey and the function to call when it's activated.
+        hotkeys = {
+            '<ctrl>+<cmd>+m': self.on_activate_hotkey
+        }
+        # Start the listener. It will block this thread and wait for hotkeys.
+        with GlobalHotKeys(hotkeys) as listener:
+            listener.join()
 
+# ... (no changes to AppManager class)
 class AppManager(QObject):
-    # ... (no changes in this class)
     def __init__(self, app):
         super().__init__()
         self.app = app
@@ -266,7 +270,7 @@ class AppManager(QObject):
             win.show()
             win.activateWindow()
 
-
+# ... (no changes to the main execution block)
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -285,7 +289,6 @@ if __name__ == "__main__":
 
     tray_icon.setVisible(True)
     menu = QMenu()
-    # HOTKEY CHANGE: Updated the menu text to reflect the new keybinding.
     show_action = QAction("Show/Hide Overlay (Ctrl+Cmd+M)")
     show_action.triggered.connect(manager.toggle_overlay_visibility)
     menu.addAction(show_action)
@@ -294,7 +297,6 @@ if __name__ == "__main__":
     menu.addAction(quit_action)
     tray_icon.setContextMenu(menu)
     tray_icon.setToolTip("LaTeX Inserter")
-    # HOTKEY CHANGE: Updated the console startup message.
     print("LaTeX Inserter is running. Press Ctrl+Cmd+M to open the overlay.")
     print("IMPORTANT: On macOS, you must grant this app 'Accessibility' permissions")
     print("in 'System Settings > Privacy & Security' for the hotkey to work.")
