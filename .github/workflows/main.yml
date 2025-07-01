@@ -3,50 +3,52 @@ name: Build macOS Application
 
 # --- Controls when the workflow will run ---
 on:
-  # Triggers the workflow on push events but only for the "main" branch
   push:
     branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 # --- Defines the job to be run ---
 jobs:
   build:
-    # The type of virtual machine to run the job on. This is the key part!
-    runs-on: macos-latest
+    # THE FIX 1: Explicitly use a known Intel-based macOS runner for stability.
+    # macos-13 and macos-12 are Intel. macos-14 is Apple Silicon.
+    runs-on: macos-13
 
-    # A sequence of tasks that will be executed
     steps:
-      # Step 1: Checks out your repository's code so the job can access it
+      # Step 1: Check out repository code
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      # Step 2: Sets up a Python environment on the macOS machine
+      # Step 2: Set up an x86_64 Python environment
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # You can specify a Python version
+          python-version: '3.11'
+          # THE FIX 2: Force the Python architecture to be Intel (x86_64)
+          architecture: 'x86_64'
 
-      # Step 3: Install all the dependencies from your requirements.txt file
+      # Step 3: Install dependencies with the correct architecture
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # THE FIX 3: Ensure we're using the latest PyInstaller for best universal2 support
+          pip install --upgrade pyinstaller
+          # THE FIX 4: Set ARCHFLAGS to tell pip to fetch x86_64 packages. This is crucial.
+          export ARCHFLAGS="-arch x86_64"
           pip install -r requirements.txt
 
-      # Step 4: Run your PyInstaller build script
+      # Step 4: Run your PyInstaller build script (no changes needed here)
       - name: Run PyInstaller build
         run: python3 build_macos.py
 
-      # Step 5: Upload the final .app file as a downloadable artifact
-      # The .app is a directory, so we must zip it first for easy download
+      # Step 5: Zip the .app file for upload
       - name: Zip the .app file
+        # This step will now succeed because the .app file will exist
         run: ditto -c -k --sequesterRsrc --keepParent dist/LaTeX-Inserter.app LaTeX-Inserter.zip
         
+      # Step 6: Upload the final artifact
       - name: Upload macOS App Artifact
         uses: actions/upload-artifact@v4
         with:
-          # The name of the downloadable file in GitHub
           name: LaTeX-Inserter-MacOS-App
-          # The path to the file you want to upload
           path: LaTeX-Inserter.zip
