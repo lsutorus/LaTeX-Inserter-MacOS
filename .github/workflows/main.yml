@@ -1,4 +1,4 @@
-name: Build macOS Application
+name: Build macOS Application (Intel)
 
 on:
   push:
@@ -7,7 +7,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    # Use an Intel-based runner
+    runs-on: macos-13
 
     steps:
       - name: Check out repository code
@@ -21,11 +22,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # THE FINAL TWEAK: Ensure we always use the latest PyInstaller version
-          python -m pip install --upgrade pyinstaller
+          pip install --upgrade pyinstaller
           pip install -r requirements.txt
 
       - name: Run PyInstaller build
+        # We use your simplified build_macos.py which builds a native app
         run: python3 build_macos.py
 
       - name: Zip the .app file
@@ -34,5 +35,5 @@ jobs:
       - name: Upload macOS App Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LaTeX-Inserter-MacOS-App-Apple-Silicon
+          name: LaTeX-Inserter-MacOS-App-Intel
           path: LaTeX-Inserter.zip
