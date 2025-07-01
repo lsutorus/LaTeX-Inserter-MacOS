@@ -1,17 +1,13 @@
 # A descriptive name for your workflow
 name: Build macOS Application
 
-# --- Controls when the workflow will run ---
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
-# --- Defines the job to be run ---
 jobs:
   build:
-    # THE FIX 1: Explicitly use a known Intel-based macOS runner for stability.
-    # macos-13 and macos-12 are Intel. macos-14 is Apple Silicon.
     runs-on: macos-13
 
     steps:
@@ -23,27 +19,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
+          # THE FIX: Use a more flexible version specifier. 
+          # This tells the action to find the latest available 3.11 patch version.
           python-version: '3.11'
-          # THE FIX 2: Force the Python architecture to be Intel (x86_64)
-          architecture: 'x86_64'
 
       # Step 3: Install dependencies with the correct architecture
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # THE FIX 3: Ensure we're using the latest PyInstaller for best universal2 support
           pip install --upgrade pyinstaller
-          # THE FIX 4: Set ARCHFLAGS to tell pip to fetch x86_64 packages. This is crucial.
+          # Set ARCHFLAGS to tell pip to fetch x86_64 packages.
+          # This is still necessary and very important.
           export ARCHFLAGS="-arch x86_64"
           pip install -r requirements.txt
 
-      # Step 4: Run your PyInstaller build script (no changes needed here)
+      # Step 4: Run your PyInstaller build script
       - name: Run PyInstaller build
         run: python3 build_macos.py
 
       # Step 5: Zip the .app file for upload
       - name: Zip the .app file
-        # This step will now succeed because the .app file will exist
         run: ditto -c -k --sequesterRsrc --keepParent dist/LaTeX-Inserter.app LaTeX-Inserter.zip
         
       # Step 6: Upload the final artifact
