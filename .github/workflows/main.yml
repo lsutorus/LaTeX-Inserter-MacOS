@@ -1,0 +1,52 @@
+# A descriptive name for your workflow
+name: Build macOS Application
+
+# --- Controls when the workflow will run ---
+on:
+  # Triggers the workflow on push events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# --- Defines the job to be run ---
+jobs:
+  build:
+    # The type of virtual machine to run the job on. This is the key part!
+    runs-on: macos-latest
+
+    # A sequence of tasks that will be executed
+    steps:
+      # Step 1: Checks out your repository's code so the job can access it
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      # Step 2: Sets up a Python environment on the macOS machine
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # You can specify a Python version
+
+      # Step 3: Install all the dependencies from your requirements.txt file
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Run your PyInstaller build script
+      - name: Run PyInstaller build
+        run: python3 build_macos.py
+
+      # Step 5: Upload the final .app file as a downloadable artifact
+      # The .app is a directory, so we must zip it first for easy download
+      - name: Zip the .app file
+        run: ditto -c -k --sequesterRsrc --keepParent dist/LaTeX-Inserter.app LaTeX-Inserter.zip
+        
+      - name: Upload macOS App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # The name of the downloadable file in GitHub
+          name: LaTeX-Inserter-MacOS-App
+          # The path to the file you want to upload
+          path: LaTeX-Inserter.zip
