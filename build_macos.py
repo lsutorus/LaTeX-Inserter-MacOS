@@ -8,7 +8,7 @@ import matplotlib
 # --- CONFIGURATION ---
 ICON_FILENAME = "icon.png"
 APP_NAME = "LaTeX-Inserter"
-PLIST_FILENAME = "Info.plist" # Define the new plist file
+PLIST_FILENAME = "Info.plist"
 
 # --- Step 1: Clean up old build files ---
 print("Cleaning up old build directories...")
@@ -28,7 +28,6 @@ for folder in ['build', 'dist', f'{APP_NAME}.spec']:
 if not os.path.exists(ICON_FILENAME):
     print(f"ERROR: '{ICON_FILENAME}' not found. Please add it to the project folder.")
     sys.exit(1)
-# Add a check for our new Info.plist file
 if not os.path.exists(PLIST_FILENAME):
     print(f"ERROR: '{PLIST_FILENAME}' not found. Please add it to the project folder.")
     sys.exit(1)
@@ -47,6 +46,12 @@ print(f"Found matplotlib data at: {mpl_data_path}")
 add_data_icon = f'{ICON_FILENAME}{separator}.'
 print(f"Will bundle '{ICON_FILENAME}'.")
 
+# THE FIX: We also bundle the Info.plist as a data file.
+# PyInstaller's macOS hooks will find and use it.
+add_data_plist = f'{PLIST_FILENAME}{separator}.'
+print(f"Will bundle '{PLIST_FILENAME}' for app metadata.")
+
+
 # --- Step 4: Run the PyInstaller Build Command for macOS ---
 print("\nStarting PyInstaller build for macOS...")
 try:
@@ -59,10 +64,10 @@ try:
         f'--add-data={add_data_unicode}',
         f'--add-data={add_data_matplotlib}',
         f'--add-data={add_data_icon}',
+        # THIS IS THE CORRECTED WAY TO INCLUDE THE PLIST
+        f'--add-data={add_data_plist}',
         '--clean',
-        # THIS IS THE CRITICAL NEW ARGUMENT
         f'--osx-bundle-identifier=com.yourname.latexinserter',
-        f'--info-plist={PLIST_FILENAME}'
     ])
     print(f"\nBuild complete! The '{APP_NAME}.app' bundle is in the 'dist' folder.")
 
