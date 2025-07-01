@@ -1,4 +1,4 @@
-name: Build macOS Application (Intel)
+name: Build macOS Application (Forced Intel)
 
 on:
   push:
@@ -7,7 +7,6 @@ on:
 
 jobs:
   build:
-    # Use an Intel-based runner
     runs-on: macos-13
 
     steps:
@@ -19,15 +18,22 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      # THE FIX: We force pip to only install x86_64 compatible packages.
+      - name: Install dependencies with Forced x86_64 Arch
         run: |
           python -m pip install --upgrade pip
           pip install --upgrade pyinstaller
+          # This environment variable is the key.
+          export ARCHFLAGS="-arch x86_64"
           pip install -r requirements.txt
 
       - name: Run PyInstaller build
-        # We use your simplified build_macos.py which builds a native app
         run: python3 build_macos.py
+
+      - name: Verify Final Executable Architecture
+        run: |
+          echo "--- Verifying architecture of all bundled Mach-O files ---"
+          find dist/LaTeX-Inserter.app -type f -exec file {} \; | grep "Mach-O"
 
       - name: Zip the .app file
         run: ditto -c -k --sequesterRsrc --keepParent dist/LaTeX-Inserter.app LaTeX-Inserter.zip
