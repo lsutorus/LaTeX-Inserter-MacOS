@@ -42,7 +42,7 @@ add_data_icon = f'{ICON_FILENAME}{separator}.'
 print(f"Will bundle '{ICON_FILENAME}'.")
 
 # --- Step 4: Run the PyInstaller Build Command for macOS ---
-print("\nStarting PyInstaller Universal 2 build for macOS...")
+print("\nStarting PyInstaller native build for macOS...")
 try:
     PyInstaller.__main__.run([
         'main.py',
@@ -53,12 +53,10 @@ try:
         f'--add-data={add_data_unicode}',
         f'--add-data={add_data_matplotlib}',
         f'--add-data={add_data_icon}',
-        # --- THIS IS THE CRUCIAL CHANGE ---
-        '--target-arch=universal2',
-        # It's also good practice to add --clean to avoid caching issues
+        # THE FIX: We have REMOVED the '--target-arch=universal2' line
         '--clean'
     ])
-    print(f"\nBuild complete! The Universal 2 '{APP_NAME}.app' bundle is in the 'dist' folder.")
+    print(f"\nBuild complete! The '{APP_NAME}.app' bundle is in the 'dist' folder.")
 
 except Exception as e:
     print(f"\nAn error occurred during the build process: {e}")
