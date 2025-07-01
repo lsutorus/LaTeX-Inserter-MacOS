@@ -5,15 +5,13 @@ import matplotlib
 import pyautogui
 import pygetwindow as gw
 import unicodeitplus
-# MACOS CHANGE: Removed win32clipboard and win32con
 from PIL import Image
-# MACOS CHANGE: Replaced keyboard with pynput for robust, cross-platform hotkeys
 from pynput import keyboard
 import threading
 import os
 
-from PyQt5.QtCore import Qt, QObject, QTimer, QPoint, pyqtSignal
-from PyQt5.QtGui import (QIcon, QFont, QPalette, QColor, QPixmap, QPainter, QBrush,
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QPoint
+from PyQt5.QtGui import (QIcon, QFont, QColor, QPixmap, QPainter, QBrush,
                          QPen, QImage)
 from PyQt5.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QAction, QWidget,
                              QVBoxLayout, QLineEdit, QLabel, QSizePolicy)
@@ -31,6 +29,7 @@ def resource_path(relative_path):
 
 
 class LaTeXOverlay(QWidget):
+    # ... (no changes in this class)
     def __init__(self):
         super().__init__()
         self.setWindowFlags(
@@ -58,7 +57,6 @@ class LaTeXOverlay(QWidget):
         self.setLayout(self.layout)
         self.input_box = QLineEdit()
         self.input_box.setPlaceholderText("Enter LaTeX (e.g., \\sqrt{x^2} or \\nu)")
-        # MACOS CHANGE: Removed specific font for better cross-platform compatibility
         self.input_box.setFont(QFont("", 16))
         self.input_box.textChanged.connect(self.update_preview)
         self.input_box.returnPressed.connect(self.insert_and_hide)
@@ -167,8 +165,6 @@ class LaTeXOverlay(QWidget):
             self.hide()
             return
         self.hide()
-        # MACOS NOTE: This .activate() call can be unreliable on macOS.
-        # Fortunately, the subsequent paste command will go to the active window anyway.
         if self.last_active_window:
             try:
                 time.sleep(0.1)
@@ -177,7 +173,6 @@ class LaTeXOverlay(QWidget):
             except Exception as e:
                 print(f"Could not activate previous window: {e}")
 
-        # MACOS CHANGE: Use 'command' (Cmd) key instead of 'ctrl' for pasting
         paste_key = 'command' if sys.platform == 'darwin' else 'ctrl'
 
         if self.use_image_mode:
@@ -193,10 +188,8 @@ class LaTeXOverlay(QWidget):
         except Exception as e:
             print(f"Failed to insert Unicode for '{latex_code}': {e}")
 
-    # MACOS CHANGE: Complete rewrite of paste_as_image to be cross-platform using PyQt
     def paste_as_image(self, latex_code, paste_key):
         try:
-            # 1. Render the LaTeX to an in-memory PNG buffer
             fig, ax = plt.subplots(figsize=(4, 1.5), dpi=150)
             ax.text(0.5, 0.5, fr"${latex_code}$", size=20, ha='center', va='center', color='#dcdcdc')
             ax.axis('off')
@@ -206,34 +199,27 @@ class LaTeXOverlay(QWidget):
             buf.seek(0)
             plt.close(fig)
 
-            # 2. Load this buffer into a QImage, which is what the clipboard needs
             qimage = QImage()
             qimage.loadFromData(buf.getvalue())
-
-            # 3. Set the clipboard using PyQt's cross-platform method
             QApplication.clipboard().setImage(qimage)
-
-            # 4. Simulate paste
             pyautogui.hotkey(paste_key, 'v')
 
         except Exception as e:
             print(f"Failed to paste image for '{latex_code}': {e}")
 
 
-# MACOS CHANGE: New Hotkey Listener class using pynput
 class HotkeyListener(QObject):
-    hotkey_activated = pyqtSignal() # A signal to safely communicate with the GUI thread
+    hotkey_activated = pyqtSignal()
 
     def __init__(self):
         super().__init__()
-        # Define the hotkey combination. Use `Key.cmd` for macOS Command key.
+        # HOTKEY CHANGE: Changed '<cmd>+<alt>+m' to '<ctrl>+<cmd>+m'
         self.hotkey = keyboard.HotKey(
-            keyboard.HotKey.parse('<cmd>+<alt>+m')
+            keyboard.HotKey.parse('<ctrl>+<cmd>+m')
         )
         self.listener_thread = None
 
     def run(self):
-        # This will run in a separate thread
         with keyboard.Listener(on_press=self.on_press) as listener:
             listener.join()
 
@@ -248,12 +234,12 @@ class HotkeyListener(QObject):
 
 
 class AppManager(QObject):
+    # ... (no changes in this class)
     def __init__(self, app):
         super().__init__()
         self.app = app
         self.overlay_window = None
 
-    # MACOS CHANGE: No more polling timer. This is now a slot connected to the hotkey signal.
     def toggle_overlay_visibility(self):
         if self.overlay_window is None:
             self.overlay_window = LaTeXOverlay()
@@ -261,19 +247,16 @@ class AppManager(QObject):
             self.overlay_window.hide()
         else:
             try:
-                # This might fail on some macOS setups or without permissions
                 self.overlay_window.last_active_window = gw.getActiveWindow()
             except Exception:
                 self.overlay_window.last_active_window = None
             win = self.overlay_window
             pos = pyautogui.position()
-            # Find the screen where the mouse is
             screen = self.app.screenAt(QPoint(pos.x, pos.y))
             if not screen:
                 screen = self.app.primaryScreen()
             screen_rect = screen.availableGeometry()
 
-            # Center the window under the cursor, but keep it on screen
             ideal_x = pos.x - win.width() // 2
             ideal_y = pos.y - 20
             final_x = max(screen_rect.left(), min(ideal_x, screen_rect.right() - win.width()))
@@ -287,22 +270,12 @@ class AppManager(QObject):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
-
-    # MACOS CHANGE: Use a .png for the icon, which PyInstaller can convert to .icns
-    # or specify a .icns file directly in the build script.
     ICON_FILENAME = "icon.png"
-
-    # MACOS CHANGE: Removed the administrator check. It's not relevant on macOS.
-    # Instead, the user must grant "Accessibility" permissions in System Settings for the hotkey.
     print("Starting AppManager and Hotkey listener...")
-
     manager = AppManager(app)
-
-    # Setup and start the hotkey listener
     hotkey_listener = HotkeyListener()
     hotkey_listener.hotkey_activated.connect(manager.toggle_overlay_visibility)
     hotkey_listener.start()
-
     tray_icon = QSystemTrayIcon()
     try:
         icon_path = resource_path(ICON_FILENAME)
@@ -312,8 +285,8 @@ if __name__ == "__main__":
 
     tray_icon.setVisible(True)
     menu = QMenu()
-    # MACOS CHANGE: Update hotkey text for the user
-    show_action = QAction("Show/Hide Overlay (Cmd+Alt+M)")
+    # HOTKEY CHANGE: Updated the menu text to reflect the new keybinding.
+    show_action = QAction("Show/Hide Overlay (Ctrl+Cmd+M)")
     show_action.triggered.connect(manager.toggle_overlay_visibility)
     menu.addAction(show_action)
     quit_action = QAction("Quit")
@@ -321,7 +294,8 @@ if __name__ == "__main__":
     menu.addAction(quit_action)
     tray_icon.setContextMenu(menu)
     tray_icon.setToolTip("LaTeX Inserter")
-    print("LaTeX Inserter is running. Press Cmd+Alt+M to open the overlay.")
+    # HOTKEY CHANGE: Updated the console startup message.
+    print("LaTeX Inserter is running. Press Ctrl+Cmd+M to open the overlay.")
     print("IMPORTANT: On macOS, you must grant this app 'Accessibility' permissions")
     print("in 'System Settings > Privacy & Security' for the hotkey to work.")
     sys.exit(app.exec_())
